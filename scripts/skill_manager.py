@@ -231,12 +231,12 @@ def remove_remote(agent_id: str, name: str) -> bool:
 
 
 OFFICIAL_SKILLS_HUB = {
-    'code_review': str(COMMUNITY_SKILLS_ROOT / 'code_review' / 'SKILL.md'),
-    'api_design': str(COMMUNITY_SKILLS_ROOT / 'api_design' / 'SKILL.md'),
-    'security_audit': str(COMMUNITY_SKILLS_ROOT / 'security_audit' / 'SKILL.md'),
-    'data_analysis': str(COMMUNITY_SKILLS_ROOT / 'data_analysis' / 'SKILL.md'),
-    'doc_generation': str(COMMUNITY_SKILLS_ROOT / 'doc_generation' / 'SKILL.md'),
-    'test_framework': str(COMMUNITY_SKILLS_ROOT / 'test_framework' / 'SKILL.md'),
+    'code_review': 'https://raw.githubusercontent.com/openclaw-ai/skills-hub/main/code_review/SKILL.md',
+    'api_design': 'https://raw.githubusercontent.com/openclaw-ai/skills-hub/main/api_design/SKILL.md',
+    'security_audit': 'https://raw.githubusercontent.com/openclaw-ai/skills-hub/main/security_audit/SKILL.md',
+    'data_analysis': 'https://raw.githubusercontent.com/openclaw-ai/skills-hub/main/data_analysis/SKILL.md',
+    'doc_generation': 'https://raw.githubusercontent.com/openclaw-ai/skills-hub/main/doc_generation/SKILL.md',
+    'test_framework': 'https://raw.githubusercontent.com/openclaw-ai/skills-hub/main/test_framework/SKILL.md',
 }
 
 SKILL_AGENT_MAPPING = {
