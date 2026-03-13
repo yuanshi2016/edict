@@ -28,10 +28,23 @@ sys.path.insert(0, str(Path(__file__).parent))
 from utils import now_iso, safe_name, read_json
 
 OCLAW_HOME = Path.home() / '.openclaw'
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+COMMUNITY_SKILLS_ROOT = PROJECT_ROOT / 'community-skills'
 
 
 def _download_file(url: str, timeout: int = 30, retries: int = 3) -> str:
-    """从 URL 下载文件内容（文本格式），支持重试"""
+    """从 URL / file:// / 本地路径读取文本内容，支持重试。"""
+    local_path = None
+    if url.startswith('file://'):
+        local_path = Path(url[7:]).expanduser().resolve()
+    elif url.startswith('/') or url.startswith('./') or url.startswith('../'):
+        local_path = Path(url).expanduser().resolve()
+
+    if local_path is not None:
+        if not local_path.exists():
+            raise Exception(f'本地文件不存在: {local_path}')
+        return local_path.read_text(encoding='utf-8')
+
     last_error = None
     for attempt in range(1, retries + 1):
         try:
@@ -47,13 +60,13 @@ def _download_file(url: str, timeout: int = 30, retries: int = 3) -> str:
             last_error = f'网络错误: {e.reason}'
         except Exception as e:
             last_error = f'{type(e).__name__}: {e}'
-        
+
         if attempt < retries:
             import time
             wait = attempt * 3  # 3s, 6s
             print(f'   ⚠️ 第 {attempt} 次下载失败({last_error})，{wait}秒后重试...')
             time.sleep(wait)
-    
+
     # 所有重试失败
     hint = ''
     if 'timed out' in str(last_error).lower() or '超时' in str(last_error):
@@ -218,12 +231,12 @@ def remove_remote(agent_id: str, name: str) -> bool:
 
 
 OFFICIAL_SKILLS_HUB = {
-    'code_review': 'https://raw.githubusercontent.com/openclaw-ai/skills-hub/main/code_review/SKILL.md',
-    'api_design': 'https://raw.githubusercontent.com/openclaw-ai/skills-hub/main/api_design/SKILL.md',
-    'security_audit': 'https://raw.githubusercontent.com/openclaw-ai/skills-hub/main/security_audit/SKILL.md',
-    'data_analysis': 'https://raw.githubusercontent.com/openclaw-ai/skills-hub/main/data_analysis/SKILL.md',
-    'doc_generation': 'https://raw.githubusercontent.com/openclaw-ai/skills-hub/main/doc_generation/SKILL.md',
-    'test_framework': 'https://raw.githubusercontent.com/openclaw-ai/skills-hub/main/test_framework/SKILL.md',
+    'code_review': str(COMMUNITY_SKILLS_ROOT / 'code_review' / 'SKILL.md'),
+    'api_design': str(COMMUNITY_SKILLS_ROOT / 'api_design' / 'SKILL.md'),
+    'security_audit': str(COMMUNITY_SKILLS_ROOT / 'security_audit' / 'SKILL.md'),
+    'data_analysis': str(COMMUNITY_SKILLS_ROOT / 'data_analysis' / 'SKILL.md'),
+    'doc_generation': str(COMMUNITY_SKILLS_ROOT / 'doc_generation' / 'SKILL.md'),
+    'test_framework': str(COMMUNITY_SKILLS_ROOT / 'test_framework' / 'SKILL.md'),
 }
 
 SKILL_AGENT_MAPPING = {
@@ -237,44 +250,45 @@ SKILL_AGENT_MAPPING = {
 
 
 def import_official_hub(agent_ids: list) -> bool:
-    """从官方 Skills Hub 导入指定的 skills 到指定 agents。
-    如果未指定 agents，使用该 skill 的推荐 agents。
+    """从内置 skills 库导入到指定 agents。
+    如果未指定 agents，则按 SKILL_AGENT_MAPPING 使用推荐导入策略。
     """
-    if not agent_ids:
-        print('❌ 未指定 agent，使用推荐配置...\n')
-        for skill_name, recommended_agents in SKILL_AGENT_MAPPING.items():
-            agent_ids.extend(recommended_agents)
-        agent_ids = list(set(agent_ids))
-    
+    use_recommended_mapping = not agent_ids
+    if use_recommended_mapping:
+        print('ℹ️ 未指定 agents，按推荐映射导入...\n')
+
     total = 0
     success = 0
     failed = []
-    
+
     for skill_name, url in OFFICIAL_SKILLS_HUB.items():
-        # 确定目标 agents
-        target_agents = agent_ids
-        if not agent_ids:
-            target_agents = SKILL_AGENT_MAPPING.get(skill_name, ['menxia'])
-        
+        target_agents = list(SKILL_AGENT_MAPPING.get(skill_name, ['menxia'])) if use_recommended_mapping else list(agent_ids)
+
         print(f'\n📥 正在导入 skill: {skill_name}')
+        print(f'   来源: {url}')
         print(f'   目标 agents: {", ".join(target_agents)}')
-        
+
         for agent_id in target_agents:
             total += 1
-            if add_remote(agent_id, skill_name, url, f'官方 skill：{skill_name}'):
+            if add_remote(agent_id, skill_name, url, f'内置 skill：{skill_name}'):
                 success += 1
             else:
                 failed.append(f'{agent_id}/{skill_name}')
-    
+
+    try:
+        import subprocess
+        subprocess.run(['python3', str(PROJECT_ROOT / 'scripts' / 'sync_agent_config.py')], timeout=10)
+    except Exception as e:
+        print(f'\n⚠️ skills 已导入，但同步 agent_config 失败: {e}')
+
     print(f'\n📊 导入完成：{success}/{total} 个 skills 成功')
     if failed:
         print(f'\n❌ 失败列表:')
         for f in failed:
             print(f'   - {f}')
         print(f'\n💡 排查建议:')
-        print(f'   1. 检查网络: curl -I https://raw.githubusercontent.com/openclaw-ai/skills-hub/main/code_review/SKILL.md')
-        print(f'   2. 设置代理: export https_proxy=http://your-proxy:port')
-        print(f'   3. 单独重试: python3 scripts/skill_manager.py add-remote --agent <agent> --name <skill> --source <url>')
+        print(f'   1. 检查本地 skill 文件是否存在于 community-skills/ 目录')
+        print(f'   2. 单独重试: python3 scripts/skill_manager.py add-remote --agent <agent> --name <skill> --source <url-or-path>')
     return success == total
 
 
