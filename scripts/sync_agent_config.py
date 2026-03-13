@@ -61,19 +61,22 @@ def get_skills(workspace: str):
     try:
         if skills_dir.exists():
             for d in sorted(skills_dir.iterdir()):
-                if d.is_dir():
-                    md = d / 'SKILL.md'
-                    desc = ''
-                    if md.exists():
-                        try:
-                            for line in md.read_text(encoding='utf-8', errors='ignore').splitlines():
-                                line = line.strip()
-                                if line and not line.startswith('#') and not line.startswith('---'):
-                                    desc = line[:100]
-                                    break
-                        except Exception:
-                            desc = '(读取失败)'
-                    skills.append({'name': d.name, 'path': str(md), 'exists': md.exists(), 'description': desc})
+                if not d.is_dir():
+                    continue
+                md = d / 'SKILL.md'
+                if not md.exists():
+                    # 跳过失败导入留下的空目录，避免 UI 出现“幽灵 skill”
+                    continue
+                desc = ''
+                try:
+                    for line in md.read_text(encoding='utf-8', errors='ignore').splitlines():
+                        line = line.strip()
+                        if line and not line.startswith('#') and not line.startswith('---'):
+                            desc = line[:100]
+                            break
+                except Exception:
+                    desc = '(读取失败)'
+                skills.append({'name': d.name, 'path': str(md), 'exists': True, 'description': desc})
     except PermissionError as e:
         log.warning(f'Skills 目录访问受限: {e}')
     return skills

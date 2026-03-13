@@ -328,11 +328,11 @@ def add_remote_skill(agent_id, skill_name, source_url, description=''):
         if 'name:' not in content[:500]:
             return {'ok': False, 'error': f'文件格式无效: {str(e)[:100]}'}
     
-    # 创建本地目录
+    # 创建本地目录（确认内容有效后再创建，避免失败时留下空目录）
     workspace = OCLAW_HOME / f'workspace-{agent_id}' / 'skills' / skill_name
     workspace.mkdir(parents=True, exist_ok=True)
     skill_md = workspace / 'SKILL.md'
-    
+
     # 写入 SKILL.md
     skill_md.write_text(content)
     

@@ -87,12 +87,7 @@ def add_remote(agent_id: str, name: str, source_url: str, description: str = '')
     if not safe_name(agent_id) or not safe_name(name):
         print(f'❌ 错误：agent_id 或 skill 名称含非法字符')
         return False
-    
-    # 设置 workspace
-    workspace = OCLAW_HOME / f'workspace-{agent_id}' / 'skills' / name
-    workspace.mkdir(parents=True, exist_ok=True)
-    skill_md = workspace / 'SKILL.md'
-    
+
     # 下载文件
     print(f'⏳ 正在从 {source_url} 下载...')
     try:
@@ -101,12 +96,17 @@ def add_remote(agent_id: str, name: str, source_url: str, description: str = '')
         print(f'❌ 下载失败：{e}')
         print(f'   URL: {source_url}')
         return False
-    
+
+    # 设置 workspace（确认下载成功后再创建，避免失败时留下空目录）
+    workspace = OCLAW_HOME / f'workspace-{agent_id}' / 'skills' / name
+    workspace.mkdir(parents=True, exist_ok=True)
+    skill_md = workspace / 'SKILL.md'
+
     # 基础验证（放宽检查：有些 skill 不以 --- 开头）
     if len(content.strip()) < 10:
         print(f'❌ 文件内容过短或为空')
         return False
-    
+
     # 保存 SKILL.md
     skill_md.write_text(content)
     
