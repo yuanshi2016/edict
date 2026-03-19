@@ -2,12 +2,13 @@
 import json, pathlib, datetime, logging
 from file_lock import atomic_json_write, atomic_json_read
 from utils import read_json
+from shared_context import resolve_shared_data_root, DEFAULT_MANIFEST_PATH
 
 log = logging.getLogger('refresh')
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(name)s] %(message)s', datefmt='%H:%M:%S')
 
 BASE = pathlib.Path(__file__).parent.parent
-DATA = BASE / 'data'
+DATA = resolve_shared_data_root()
 
 
 def output_meta(path):
@@ -95,7 +96,9 @@ def main():
 
     payload = {
         'generatedAt': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-        'taskSource': 'tasks_source.json' if (DATA / 'tasks_source.json').exists() else 'tasks.json',
+        'sharedDataRoot': str(DATA),
+        'manifestPath': str(DEFAULT_MANIFEST_PATH),
+        'taskSource': str(DATA / ('tasks_source.json' if (DATA / 'tasks_source.json').exists() else 'tasks.json')),
         'officials': officials,
         'tasks': tasks,
         'history': history,

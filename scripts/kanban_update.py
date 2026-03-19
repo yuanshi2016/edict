@@ -25,8 +25,11 @@
 import json, pathlib, datetime, sys, subprocess, logging, os, re
 
 _BASE = pathlib.Path(__file__).resolve().parent.parent
-TASKS_FILE = _BASE / 'data' / 'tasks_source.json'
 REFRESH_SCRIPT = _BASE / 'scripts' / 'refresh_live_data.py'
+from shared_context import resolve_shared_data_root, load_submit_guard_record, load_shared_manifest, fail_closed  # noqa: E402
+_SHARED_DATA_ROOT = resolve_shared_data_root()
+_SHARED_MANIFEST = load_shared_manifest()
+TASKS_FILE = _SHARED_DATA_ROOT / 'tasks_source.json'
 
 log = logging.getLogger('kanban')
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(name)s] %(message)s', datefmt='%H:%M:%S')
@@ -70,8 +73,10 @@ def save(tasks):
     atomic_json_write(TASKS_FILE, tasks)
     # 异步触发刷新，不阻塞调用方
     try:
+        env = dict(os.environ)
+        env.setdefault('SANSHENG_SHARED_DATA_ROOT', str(_SHARED_DATA_ROOT))
         subprocess.Popen(['python3', str(REFRESH_SCRIPT)],
-                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, env=env)
     except Exception:
         pass
 
@@ -245,24 +250,40 @@ def cmd_flow(task_id, from_dept, to_dept, remark):
 
 
 def cmd_done(task_id, output_path='', summary=''):
-    """标记任务完成（原子操作）"""
+    """标记任务完成（原子操作）。
+
+    fail-closed：done 前必须存在 submit_guard 证据（gitHead / gitStatus /
+    changedFiles / tests / reportPath）；缺证据则中止。
+    """
+    evidence = load_submit_guard_record(task_id, _SHARED_MANIFEST)
+    report_path = str(evidence.get('reportPath') or output_path or '')
+    if output_path and report_path and output_path != report_path:
+        fail_closed(f'cmd_done 输出路径与 submit_guard 不一致：done={output_path} guard={report_path}')
+
     def modifier(tasks):
         t = find_task(tasks, task_id)
         if not t:
             log.error(f'任务 {task_id} 不存在')
             return tasks
         t['state'] = 'Done'
-        t['output'] = output_path
+        t['output'] = report_path
         t['now'] = summary or '任务已完成'
+        t['submitGuard'] = {
+            'gitHead': evidence.get('gitHead'),
+            'gitStatus': evidence.get('gitStatus'),
+            'changedFiles': evidence.get('changedFiles', []),
+            'tests': evidence.get('tests', []),
+            'reportPath': report_path,
+        }
         t.setdefault('flow_log', []).append({
             "at": now_iso(), "from": t.get('org', '执行部门'),
-            "to": "皇上", "remark": f"✅ 完成：{summary or '任务已完成'}"
+            "to": "皇上", "remark": f"✅ 完成：{summary or '任务已完成'} | HEAD={str(evidence.get('gitHead') or '')[:7]}"
         })
         t['updatedAt'] = now_iso()
         return tasks
     atomic_json_update(TASKS_FILE, modifier, [])
     save(load())  # trigger refresh
-    log.info(f'✅ {task_id} 已完成')
+    log.info(f'✅ {task_id} 已完成（submit_guard 已校验）')
 
 
 def cmd_block(task_id, reason):
