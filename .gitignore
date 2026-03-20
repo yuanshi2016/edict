@@ -10,6 +10,11 @@ data/tasks.json
 data/bitable_source.json
 data/mission_control_tasks.json
 
+# Local deployment/runtime artifacts
+.htaccess
+.memory-system-v2.conf
+clawd/
+
 # Logs
 *.log
 /tmp/
