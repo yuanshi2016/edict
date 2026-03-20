@@ -20,7 +20,7 @@ from urllib.request import Request, urlopen
 scripts_dir = str(pathlib.Path(__file__).parent.parent / 'scripts')
 sys.path.insert(0, scripts_dir)
 from file_lock import atomic_json_read, atomic_json_write, atomic_json_update
-from utils import validate_url, read_json, now_iso
+from utils import validate_url, read_json, now_iso, build_ssl_context
 from court_discuss import (
     create_session as cd_create, advance_discussion as cd_advance,
     get_session as cd_get, conclude_session as cd_conclude,
@@ -276,12 +276,13 @@ def add_remote_skill(agent_id, skill_name, source_url, description=''):
             # 从 URL 下载，带超时保护
             req = Request(source_url, headers={'User-Agent': 'OpenClaw-SkillManager/1.0'})
             try:
-                resp = urlopen(req, timeout=10)
+                ssl_ctx = build_ssl_context()
+                resp = urlopen(req, timeout=10, context=ssl_ctx)
                 content = resp.read(10 * 1024 * 1024).decode('utf-8')  # 最多 10MB
                 if len(content) > 10 * 1024 * 1024:
                     return {'ok': False, 'error': '文件过大（最大 10MB）'}
             except Exception as e:
-                return {'ok': False, 'error': f'URL 无法访问: {str(e)[:100]}'}
+                return {'ok': False, 'error': f'URL 无法访问: {str(e)[:160]}'}
         
         elif source_url.startswith('file://'):
             # file:// URL 格式

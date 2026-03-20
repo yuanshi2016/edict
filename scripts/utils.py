@@ -3,7 +3,7 @@
 三省六部 · 公共工具函数
 避免 read_json / now_iso 等基础函数在多个脚本中重复定义
 """
-import json, pathlib, datetime
+import json, pathlib, datetime, os, ssl
 
 
 def read_json(path, default=None):
@@ -52,3 +52,30 @@ def validate_url(url: str, allowed_schemes=('https',), allowed_domains=None) -> 
         return True
     except Exception:
         return False
+
+
+def build_ssl_context() -> ssl.SSLContext:
+    """构建尽量稳妥的 HTTPS 证书校验上下文。
+
+    优先级：
+    1. 显式环境变量 OPENCLAW_CA_BUNDLE / SSL_CERT_FILE / REQUESTS_CA_BUNDLE
+    2. certifi CA bundle（若可用）
+    3. 系统默认 CA
+    """
+    bundle = (
+        os.environ.get('OPENCLAW_CA_BUNDLE')
+        or os.environ.get('SSL_CERT_FILE')
+        or os.environ.get('REQUESTS_CA_BUNDLE')
+    )
+    if bundle and pathlib.Path(bundle).exists():
+        return ssl.create_default_context(cafile=bundle)
+
+    try:
+        import certifi  # type: ignore
+        cafile = certifi.where()
+        if cafile and pathlib.Path(cafile).exists():
+            return ssl.create_default_context(cafile=cafile)
+    except Exception:
+        pass
+
+    return ssl.create_default_context()

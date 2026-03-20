@@ -26,7 +26,7 @@ import urllib.error
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
-from utils import now_iso, safe_name, read_json
+from utils import now_iso, safe_name, read_json, build_ssl_context
 
 OCLAW_HOME = Path.home() / '.openclaw'
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -50,7 +50,8 @@ def _download_file(url: str, timeout: int = 30, retries: int = 3) -> str:
     for attempt in range(1, retries + 1):
         try:
             req = urllib.request.Request(url, headers={'User-Agent': 'OpenClaw-SkillManager/1.0'})
-            with urllib.request.urlopen(req, timeout=timeout) as resp:
+            ssl_ctx = build_ssl_context()
+            with urllib.request.urlopen(req, timeout=timeout, context=ssl_ctx) as resp:
                 content = resp.read(10 * 1024 * 1024)  # 最多 10MB
                 return content.decode('utf-8')
         except urllib.error.HTTPError as e:
